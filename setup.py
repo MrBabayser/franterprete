@@ -17,7 +17,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
 name='franterprete', # nom du paquet
 version='1.0.0', # version du paquet
-packages=find_packages(), # détecte automatiquement tous les paquets à inclure
+packages=find_packages(), # détecte automatiquement tous les paquets à inclure grâce à __init__.py
 install_requires=[ # liste des dépendances nécessaires à l'installation de ce paquet
 'sly==0.5',
 'pynput==1.7.6',
