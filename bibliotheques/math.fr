@@ -1,0 +1,249 @@
+/****************************************************************************************
+  Nom ......... : math.fr
+  Rôle ........ : petite bibliothèque de fonctions mathématiques en langage Franterprète
+  Auteur ...... : Georges Miot
+  Version ..... : V1.0 du 24/10/2023
+  Licence ..... : réalisé dans le cadre du cours de I&C
+  Importation . : CEXE("math.fr")
+*****************************************************************************************/
+
+// renvoie la factorielle d'un nombre
+// fact(<NOMBRE> nombre)
+FONCTION fact(nombre){
+	SI PAS INSTANCE(nombre, 'no'):
+		AFFICHER("Fonction usage: fact(<NOMBRE> nombre)");
+		RETOURNER $;
+	SI nombre == 0: RETOURNER 1 $;
+	resultat = 1;
+	POUR(i=1;i<nombre+1;i++):
+		resultat *= i $;
+	RETOURNER resultat
+};
+
+// renvoie la plus grande valeur d'une liste de nombres ou d'une liste de chaînes
+// max(<LISTE <NOMBRE||CHAINE>> liste)
+FONCTION max(liste){
+	SI PAS INSTANCE(liste, 'li') OU TAILLE(liste) == 0:
+		AFFICHER("Fonction usage: max(<LISTE <NOMBRE||CHAINE>> liste)");
+		RETOURNER $;
+	max_val = liste[0];
+	POUR CHAQUE nombre DANS liste:
+		SI nombre > max_val:
+			max_val = nombre $$;
+	RETOURNER max_val
+};
+
+// renvoie la plus petite valeur d'une liste de nombres ou d'une liste de chaînes
+// min(<LISTE <NOMBRE||CHAINE>> liste)
+FONCTION min(liste){
+	SI PAS INSTANCE(liste, 'li') OU TAILLE(liste) == 0:
+		AFFICHER("Fonction usage: min(<LISTE <NOMBRE||CHAINE>> liste)");
+		RETOURNER $;
+	min_val = liste[0];
+	POUR CHAQUE nombre DANS liste:
+		SI nombre < min_val:
+			min_val = nombre $$;
+	RETOURNER min_val
+};
+
+// renvoie une approximation du sinus de x (en radians)
+// sin(<NOMBRE> angle, <NOMBRE> precision)
+FONCTION sin(angle, precision){
+	SI PAS INSTANCE(angle, 'no') OU PAS INSTANCE(precision, 'no'):
+		AFFICHER("Fonction usage: sin(<NOMBRE> angle, <NOMBRE> precision)");
+		RETOURNER $;
+	SI precision < 0:	AFFICHER("La précision doit être supérieure ou égale à 0"); RETOURNER $;
+	sin = 0.0;
+	POUR(n=0;n<precision+1;n++):
+		sin += ((-1)^n) * (angle^(2*n+1)) / fact(2*n+1) $; // série de Maclaurin
+	RETOURNER sin
+};
+
+// renvoie une approximation du cosinus de x (en radians)
+// cos(<NOMBRE> angle, <NOMBRE> precision)
+FONCTION cos(angle, precision){
+	SI PAS INSTANCE(angle, 'no') OU PAS INSTANCE(precision, 'no'):
+		AFFICHER("Fonction usage: cos(<NOMBRE> angle, <NOMBRE> precision)");
+		RETOURNER $;
+	SI precision < 0:	AFFICHER("La précision doit être supérieure ou égale à 0"); RETOURNER $;
+	cos = 0.0;
+	POUR(n=0;n<precision+1;n++):
+		cos += ((-1)^n) * (angle^(2*n)) / fact(2*n) $; // série de Maclaurin
+	RETOURNER cos
+};
+
+// renvoie une approximation de la tangente de x (en radians)
+// tan(<NOMBRE> angle, <NOMBRE> precision)
+FONCTION tan(angle, precision){
+	SI PAS INSTANCE(angle, 'no') OU PAS INSTANCE(precision, 'no'):
+		AFFICHER("Fonction usage: tan(<NOMBRE> angle, <NOMBRE> precision)");
+		RETOURNER $;
+	SI precision < 0:	AFFICHER("La précision doit être supérieure ou égale à 0"); RETOURNER $;
+	sin = sin(angle, precision);
+	cos = cos(angle, precision);
+	SI cos == 0:
+  	AFFICHER("Tangente non définie pour l'angle donné");
+  	RETOURNER $;
+  RETOURNER sin / cos
+};
+
+// renvoie une approximation du logarithme naturel d'un nombre
+// ln(<NOMBRE> nombre, <NOMBRE> precision)
+FONCTION ln(nombre, precision){
+	SI PAS INSTANCE(nombre, 'no') OU PAS INSTANCE(precision, 'no'):
+		AFFICHER("Fonction usage: ln(<NOMBRE> nombre, <NOMBRE> precision)");
+		RETOURNER $;
+	SI precision < 0:	AFFICHER("La précision doit être supérieure ou égale à 0"); RETOURNER $;
+	SI nombre <= 0: AFFICHER("Le logarithme n'est pas défini pour nombre <= 0"); RETOURNER $;
+	SI nombre == 1: RETOURNER 0 $;
+	SI nombre > 2:
+   	RETOURNER -ln(1/nombre, precision) $; // plus efficace pour nombre > 2
+  nombre -= 1;
+  ln = 0;
+  POUR(n=1;n<precision+1;n++):
+  	ln += ((-1)^(n+1)) * (nombre^n) / n $; // série de Maclaurin
+  RETOURNER ln
+};
+
+// renvoie une approximation du logarithme décimal d'un nombre
+// log(<NOMBRE> nombre, <NOMBRE> precision)
+FONCTION log(nombre, precision){
+	SI PAS INSTANCE(nombre, 'no') OU PAS INSTANCE(precision, 'no'):
+		AFFICHER("Fonction usage: log(<NOMBRE> nombre, <NOMBRE> precision)");
+		RETOURNER $;
+	SI precision < 0:	AFFICHER("La précision doit être supérieure ou égale à 0"); RETOURNER $;
+	SI nombre <= 0: AFFICHER("Le logarithme n'est pas défini pour nombre <= 0"); RETOURNER $;
+	ln_nombre = ln(nombre, precision);
+	ln_10 = ln(10, precision);
+	RETOURNER ln_nombre / ln_10
+};
+
+// renvoie une approximation de l'exponentielle d'un nombre
+// exp(<NOMBRE> nombre, <NOMBRE> precision)
+FONCTION exp(nombre, precision){
+	SI PAS INSTANCE(nombre, 'no') OU PAS INSTANCE(precision, 'no'):
+		AFFICHER("Fonction usage: exp(<NOMBRE> nombre, <NOMBRE> precision)");
+		RETOURNER $;
+	SI precision < 0:	AFFICHER("La précision doit être supérieure ou égale à 0"); RETOURNER $;
+	exp = 0.0;
+	POUR(n=0;n<precision+1;n++):
+		exp += nombre^n / fact(n) $; // série de Maclaurin
+	RETOURNER exp
+};
+
+// renvoie la moyenne d'une liste de nombres
+// moy(<LISTE <NOMBRE>> liste)
+FONCTION moy(liste){
+	SI PAS INSTANCE(liste, 'li') OU TAILLE(liste) == 0:
+		AFFICHER("Fonction usage: moy(<LISTE <NOMBRE>> liste)");
+		RETOURNER $;
+	somme = 0;
+	POUR CHAQUE nombre DANS liste:
+		somme += nombre $;
+	RETOURNER somme / TAILLE(liste)
+};
+
+// renvoie la médiane d'une liste de nombres
+// med(<LISTE <NOMBRE>> liste)
+FONCTION med(liste){
+	SI PAS INSTANCE(liste, 'li') OU TAILLE(liste) == 0:
+		AFFICHER("Fonction usage: med(<LISTE <NOMBRE>> liste)");
+		RETOURNER $;
+	liste_triee = TRIER(liste);
+	taille = TAILLE(liste_triee);
+	milieu = ARRI(taille / 2);
+	SI taille % 2 == 0: // si liste paire
+  	RETOURNER (liste_triee[milieu-1] + liste_triee[milieu]) / 2 $;
+	RETOURNER liste_triee[milieu] // si liste impaire
+};
+
+/* convertit un nombre décimal en nombre hexadécimal
+	 le nombre décimal est d'abord converti en un nombre entier
+	 renvoie un type CHAINE
+	 decenhex(<NOMBRE> decimal) */
+FONCTION decenhex(decimal){
+	SI PAS INSTANCE(decimal, 'no'):
+		AFFICHER("Fonction usage: decenhex(<NOMBRE> decimal)");
+		RETOURNER $;
+	nombre = ARRI(decimal); // traite que les nombres entiers
+	SI nombre == 0: RETOURNER '0' $;
+  SI nombre < 0: nombre = -nombre $; // nombre positif pour faciliter la conversion
+  hexadecimal = '';
+  TANTQUE nombre > 0{
+  	reste = nombre % 16;
+    SI reste < 10:
+    	hex = CHAINE(reste) $
+    SINON:
+			SELON reste{
+			 CAS 10: hex = 'A' $
+			 CAS 11: hex = 'B' $
+			 CAS 12: hex = 'C' $
+			 CAS 13: hex = 'D' $
+			 CAS 14: hex = 'E' $
+			 CAS 15: hex = 'F' $
+			}$;
+    hexadecimal = hex + hexadecimal;
+    nombre = ARRI(nombre / 16)
+  };
+  SI decimal < 0: RETOURNER '-' + hexadecimal $; // remet négatif au besoin
+  RETOURNER hexadecimal
+};
+
+/* convertit un nombre hexadécimal en nombre décimal
+	 le nombre hexadécimal doit être de type CHAINE
+	 renvoie un type NOMBRE
+	 hexendec(<CHAINE> hexadecimal) */
+FONCTION hexendec(hexadecimal){
+	SI PAS INSTANCE(hexadecimal, 'ch') OU TAILLE(hexadecimal) == 0:
+		AFFICHER("Fonction usage: hexendec(<CHAINE> hexadecimal)");
+		RETOURNER $;
+  taille = TAILLE(hexadecimal);
+  SI taille > 1 ET hexadecimal[0] == '-' ET hexadecimal[1] != '-': // si nombre négatif
+  	hex = '';
+  	POUR(i=1;i<taille;i++): hex += hexadecimal[i] $; // enlève le signe '-' pour faciliter la conversion
+  	decimal = hexendec(hex); // convertit récursivement
+  	SI decimal != VIDE : RETOURNER -decimal $; // renvoie le nombre négatif
+  	RETOURNER $; // si nombre invalide
+  decimal = 0;
+  POUR(i=0;i<taille;i++){
+  	caractere = hexadecimal[taille-1-i]; // commence par le caractère le plus à droite
+    SELON MAJ(caractere){
+			 CAS 'A': dec = 10 $
+			 CAS 'B': dec = 11 $
+			 CAS 'C': dec = 12 $
+			 CAS 'D': dec = 13 $
+			 CAS 'E': dec = 14 $
+			 CAS 'F': dec = 15 $
+			 AUTREMENT:
+			 	dec = NOMB(caractere);
+    		SI PAS INSTANCE(dec, 'no'):
+    			AFFICHER("Nombre hexadécimal invalide");
+					RETOURNER $$
+			};
+    decimal += dec * 16^i
+	};
+  RETOURNER decimal
+};
+
+/* vérifie si un nombre est hexadécimal
+ 	 par défaut un type NOMBRE est considéré comme hexadécimal
+ 	 esthex(<CHAINE|NOMBRE|BOOLEEN|LISTE|VIDE> hexadecimal) */
+FONCTION esthex(hexadecimal){
+	SI PAS INSTANCE(hexadecimal, 'no') ET (PAS INSTANCE(hexadecimal, 'ch') OU TAILLE(hexadecimal) == 0):
+		RETOURNER FAUX $;
+	SI INSTANCE(hexadecimal, 'no'): RETOURNER VRAI $; // par défaut mais pourrait être considéré l'inverse car décimal
+  taille = TAILLE(hexadecimal);
+  SI taille > 1 ET hexadecimal[0] == '-' ET hexadecimal[1] != '-': // si nombre négatif
+  	hex = '';
+  	POUR(i=1;i<taille;i++): hex += hexadecimal[i] $; // enlève le signe '-' pour faciliter la conversion
+  	RETOURNER esthex(hex) $; // vérifie récursivement
+  carac_hexa = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+  hexadecimal = MAJ(hexadecimal); // accepte hexadécimal écrit en minuscule ou en majuscule
+  POUR CHAQUE caractere DANS hexadecimal:
+  	boolhex = FAUX;
+  	SI caractere == ' ' OU caractere == '	': CONTINUER $; // ignore espace et tabulation
+  	POUR CHAQUE c DANS carac_hexa: // vérifie si caractère valide :
+  		SI c == caractere: boolhex = VRAI; STOP $$; // si caractère valide, va tester le suivant
+  	SI PAS boolhex: RETOURNER FAUX $$; // si caractère invalide, nombre pas hexadécimal
+  RETOURNER VRAI // ici tous les caractèrs sont valides, nombre forcément hexadécimal
+};

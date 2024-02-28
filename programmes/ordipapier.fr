@@ -1,0 +1,399 @@
+'''
+  Nom ......... : ordipapier.fr
+  Rôle ........ : émulateur avec débogueur de l'ordinateur papier qui lit un code numérique à partir d'un fichier et l'exécute
+  Auteur ...... : Georges Miot
+  Version ..... : V1.0 du 09/11/2023
+  Licence ..... : réalisé dans le cadre du cours de I&C
+  Chargement .. : CEXE("ordipapier.fr")
+  Exécution ... : ordipapier(<CHAINE> programme_à_exécuter_ou_-h_(aide), <CHAINE> -options_débogueur_(optionnel))
+'''
+
+# fonction encapsulant le programme
+DEF ordipapier(programme, options){
+  max_cycles = 9999; # nombre maximum de cycles pour éviter boucle infinie
+  memoire=[0]*256; # contenu mémoire initialisé à 0
+  PC = 0; OP = 0; A = 0; RS = 0; RM = 0; AD = 0; out = 0; addPtArret = 0; affValAdresse = 0;
+  step = FAUX; memory = FAUX; registre = FAUX; instruction = FAUX; depAdresse = FAUX; modifMemoire = FAUX;
+  ptArret = FAUX; affPtArret = FAUX; affVal = FAUX; affCycle = FAUX; phaseIII = VRAI;
+  cycle = 0; nbCycles = 0;
+  messArg = "argument(s) non valide(s)...Appuyez sur <Entrée> pour voir les options possibles sinon tapez 's' pour stopper : ";
+  messGoStop = "Appuyez sur <Entrée> pour continuer ou 's' pour stopper le programme : ";
+  
+  FONC main(programme, options){
+    SI PAS TYPE(programme, 'ch') OU PAS TYPE(options, 'ch') ET options != °:
+      usage("ordipapier(<CHAINE> programme_à_exécuter_ou_-h_(aide), <CHAINE> -options_débogueur_(optionnel))") $;
+    SI LONG(programme) == 0: usage("Il manque le nom du programme ou l'option '-h' pour voir l'aide...") $; # si pas de programme à charger
+    SI programme == "-h" ET PAS options: affiche_aide(); RET $; # si l'utilisateur veut uniquement voir l'aide
+    SI options ET LONG(options) > 1 ET options[0] == '-': balaye_arguments(options) $ # vérifie si des options sont renseignées
+    SINON: SI options ET PAS stepper(messArg, "s"): usage("L'utilisateur a mis fin au programme") $ # si les options sont mal renseignées
+    SINON: SI options: affiche_aide(); FIN() $$$;
+    GLOB PC = saisie_hexadecimal("Entrez l'adresse de départ du programme en hexadécimal (0x00 à 0xFF) : ");
+    SI PC < 32: AFF("Attention ! Chargement sur la ROM ! ", ''); SI PAS stepper(messGoStop, "s"): FIN() $$; # certains programmes démarrent sur la ROM
+    fichier = CHARGE(programme); # importe le programme pour ordi papier
+    SI PAS fichier: RET $; # si problème importation
+    SI charge_programme(fichier, PC): usage("Programme trop long ! La mémoire est de 256 bytes (0x00 à 0xFF) !") $; # ouvre le programme pour ordi papier
+    run_programme()
+  };
+  
+  FONC usage(message){
+    AFF(message); # affiche erreur
+    FIN()         # arrête le programme
+  };
+  
+  FONC balaye_arguments(options){
+    i = 0;
+    POUR CHAQUE c DANS options{
+      SELON c:
+        CAS '-': $
+        CAS 'a': GLOB affCycle = VRAI $
+        CAS 'b': GLOB modifMemoire = VRAI $
+        CAS 'c': REP: GLOB nbCycles = saisie_entpos("Nombre de cycles : ")$ TANQUE nbCycles == 0 $
+        CAS 'g': GLOB depAdresse = VRAI $
+        CAS 'h': affiche_aide() $
+        CAS 'i': GLOB instruction = VRAI $
+        CAS 'm': GLOB memory = VRAI $
+        CAS 'p': GLOB ptArret = VRAI; GLOB addPtArret = saisie_hexadecimal("Adresse du point d'arrêt : ") $
+        CAS 'r': GLOB registre = VRAI $
+        CAS 's': GLOB step = VRAI $
+        CAS 'v': GLOB affVal = VRAI; GLOB affValAdresse = saisie_hexadecimal("Adresse à afficher : ") $
+        AUTRE: SI PAS stepper(messArg, "s"): usage("L'utilisateur a mis fin au programme") $ SINON: affiche_aide(); FIN() $$$
+    }
+  };
+  
+  FONC saisie_hexadecimal(demande){
+    POUR(hexa=°;hexa == ° OU hexa < 0 OU hexa > 255;hexa = hexendec(SAISIR(demande))):$; # force l'utilisateur à taper un nombre correct
+    RET hexa
+  };
+  
+  FONC saisie_entpos(demande){
+    POUR(entpos=0;PAS TYPE(entpos, 'no') OU entpos <= 0;entpos = NOMB(SAISIR(demande))):$; # force l'utilisateur à taper un nombre correct
+    RET entpos
+  };
+  
+  FONC charge_programme(flux, adresse){
+    flux = flux[0];
+    code = '';
+    POUR CHAQUE caractere DANS flux{
+      SI caractere == ' ' OU caractere == '\t' OU caractere == '\n': CONT $; # ignore caractères d'espacement
+      SI PAS esthex(caractere): usage("Programme invalide !") $;
+      code += caractere;
+      SI LONG(code) == 2: # si op code valide
+        memoire[adresse] = hexendec(code); # place le code dans la mémoire
+        code = '';
+        SI ++adresse > 255: RET VRAI $$ # si trop de codes dans le programme
+    };
+    RET FAUX # ici, plus de code à charger
+  };
+  
+  FONC run_programme(){
+    TANQUE ++cycle <= max_cycles ET PC >= 0{
+      GLOB phaseIII = VRAI; # par défaut il y a une phase III
+      debogueur();
+      GLOB RS = PC;
+      GLOB RM = memoire[RS];
+      GLOB OP = RM;
+      PC++;
+      SELON OP{
+        CAS 32:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB A += RM $
+        CAS 96:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB A += RM $
+        CAS 224:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB A += RM $
+        CAS 33:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB A -= RM $
+        CAS 97:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB A -= RM $
+        CAS 225:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB A -= RM $
+        CAS 34:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          SI PAS (A ET RM): GLOB A = 1 $ # opération logique NAND avec comme résultat VRAI (1) ou FAUX (0)
+          SINON: GLOB A = 0 $$
+        CAS 98:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          SI PAS (A ET RM): GLOB A = 1 $ # opération logique NAND avec comme résultat VRAI (1) ou FAUX (0)
+          SINON: GLOB A = 0 $$
+        CAS 226:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          SI PAS (A ET RM): GLOB A = 1 $ # opération logique NAND avec comme résultat VRAI (1) ou FAUX (0)
+          SINON: GLOB A = 0 $$
+        CAS 0:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB A = RM $
+        CAS 64:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB A = RM $
+        CAS 192:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB A = RM $
+        CAS 72:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = A;
+          memoire[RS] = RM $
+        CAS 200:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = A;
+          memoire[RS] = RM $
+        CAS 73:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = saisie_hexadecimal("Entrée : ");
+          memoire[RS] = RM $
+        CAS 201:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = saisie_hexadecimal("Entrée : ");
+          memoire[RS] = RM $
+        CAS 65:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB out = RM;
+          AFF("Sortie : ", affhex(out)) $
+        CAS 193:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB AD = RM;
+          GLOB RS = AD;
+          GLOB RM = memoire[RS];
+          GLOB out = RM;
+          AFF("Sortie : ", affhex(out)) $
+        CAS 16:
+          GLOB RS = PC;
+          GLOB RM = memoire[RS];
+          GLOB PC = RM;
+          GLOB phaseIII = FAUX $
+        CAS 17:
+          SI A < 0:
+            GLOB RS = PC;
+            GLOB RM = memoire[RS];
+            GLOB PC = RM;
+            GLOB phaseIII = FAUX $$
+        CAS 18:
+          SI A == 0:
+            GLOB RS = PC;
+            GLOB RM = memoire[RS];
+            GLOB PC = RM;
+            GLOB phaseIII = FAUX $$
+        AUTRE: gest_erreur() $
+      };
+      SI phaseIII: PC++ $
+    }
+  };
+  
+  FONC gest_erreur(){
+    messOptDeb = "Erreur OP ! Appuyez sur <Entrée> pour déboguer sinon tapez 's' pour passer : ";
+    messNext = "Appuyez sur <Entrée> pour passer à la prochaine instruction ou tapez 's' pour stopper le programme : ";
+    messDeb = "Tapez 'd' pour laisser activer le débogage sinon appuyez sur <Entrée> pour poursuivre normalement l'exécution  : ";
+    AFF("Adresse[", affhex(PC), "] OP = ", affhex(OP)); # OP non valide
+    SI PAS stepper(messOptDeb, "s"):
+      SI PAS stepper(messNext, "s"): usage("L'utilisateur a mis fin au programme") $
+      SINON: RET $$;
+    affiche_memoire();
+    affiche_registre();
+    affiche_instruction();
+    modif_memoire();
+    goAdresse();
+    SI PAS stepper(messDeb, "d"):
+      GLOB step = VRAI;
+      GLOB registre = VRAI;
+      GLOB instruction = VRAI;
+      GLOB modifMemoire = VRAI $
+  };
+  
+  FONC stepper(demande, touche){
+    SI SAISIR(demande) == touche: RET FAUX $;
+    AFF(); # passe à la ligne pour la lisibilité
+    RET VRAI
+  };
+  
+  FONC debogueur(){
+    SI nbCycles > 0 ET cycle > nbCycles: FIN() $;
+    SI affCycle: AFF("Cycle = ", cycle) $;
+    SI affVal: AFF("Adresse[", affhex(affValAdresse), "] = ", affhex(memoire[affValAdresse])) $;
+    SI step OU ptArret ET test_adresse(addPtArret):
+      SI memory: affiche_memoire() $;
+      SI registre: affiche_registre() $;
+      SI instruction: affiche_instruction() $;
+      SI modifMemoire: modif_memoire() $;
+      SI depAdresse: goAdresse() $;
+      SI PAS stepper(messGoStop, "s"): usage("L'utilisateur a mis fin au programme") $$
+  };
+  
+  FONC test_adresse(adresse){
+    SI adresse == PC OU adresse == PC+1: RET VRAI $;
+    RET FAUX
+  };
+  
+  # construit un tableau représentant la mémoire en 256 bytes
+  FONC affiche_memoire(){
+    AFF("Mémoire :");
+    AFF("  | ", '');
+    POUR(i=0;i<16;++i): AFF(decenhex(i), "  | ", '') $;
+    AFF();
+    compteur = 1;
+    b = 0;
+    POUR(i=0;i<256;++i){
+      SI compteur == 1:
+        AFF(decenhex(b), " | ", affhex(memoire[i]), " | ", '');
+        compteur++ $
+      SINON: SI compteur < 16:
+        AFF(affhex(memoire[i]), " | ", '');
+        compteur++ $
+      SINON:
+        AFF(affhex(memoire[i]), " |");
+        b++;
+        compteur = 1 $$
+    };
+    AFF()
+  };
+  
+  FONC affiche_registre() {
+    AFF("Registre :");
+    AFF("PC = ", affhex(PC));
+    AFF("RS = ", affhex(RS));
+    AFF("RM = ", affhex(RM));
+    AFF("OP = ", affhex(OP));
+    AFF("AD = ", affhex(AD));
+    AFF("A = ", affhex(A), "\n");
+    AFF("Sortie : ", affhex(out), "\n");
+  };
+  
+  FONC affiche_instruction(){
+    AFF("Instruction :");
+    AFF("Adresse[", affhex(PC), "] ==> ", '');
+    AFF(affhex(memoire[PC]), " ", '');
+    AFF(affhex(memoire[PC+1]), "\n");
+  };
+  
+  FONC modif_memoire(){
+    SI stepper("Tapez 'c' pour modifier la mémoire ou appuyez sur <Entrée> pour passer : ", "c"): RET $;
+    affiche_memoire();
+    REP{
+      adresse = saisie_hexadecimal("Quelle adresse mémoire voulez-vous modifier (0x00 à 0xFF) ? ");
+      valeur = memoire[adresse];
+      AFF("Adresse[", affhex(adresse), "] = ", affhex(valeur));
+      valeur = saisie_hexadecimal("Quelle valeur voulez-vous écrire (0x00 à 0xFF) ? ");
+      memoire[adresse] = valeur;
+      AFF("Adresse[", affhex(adresse), "] = ", affhex(valeur))
+    }
+    TANQUE stepper("Appuyez sur <Entrée> pour continuer à modifier la mémoire ou 's' pour stopper : ", "s")
+  };
+  
+  FONC goAdresse(){
+    SI stepper("Tapez 'c' pour vous déplacer dans la mémoire ou appuyez sur <Entrée> pour passer : ", "c"): RET $;
+    affiche_memoire();
+    GLOB PC = saisie_hexadecimal("À quelle adresse mémoire voulez-vous aller (0x00 à 0xFF) ? ");
+    AFF("PC = ", affhex(PC));
+    GLOB phaseIII = FAUX
+  };
+  
+  FONC affiche_aide(){
+    AFF("Bienvenue dans l'émulateur papier ! Pour exécuter l'émulateur dans le terminal :\n");
+    AFF("ordipapier(<CHAINE> programme_à_exécuter_ou_-h_(aide), <CHAINE> -options_débogueur_(optionnel))\n");
+    AFF("Puis saisir l'adresse de départ du programme en hexadécimal (0x00 à 0xFF).\n");
+    AFF("Les fonctionnalités de débogage sont les suivantes :\n");
+    AFF("-a = afficher le nombre de cycles d'opérations");
+    AFF("-b = modifier des valeurs de la mémoire");
+    AFF("-c = fixer un nombre limite de cycles à effectuer");
+    AFF("-g = changer l'adresse de la prochaine instruction");
+    AFF("-h = afficher l'aide");
+    AFF("-i = afficher la prochaine instruction");
+    AFF("-m = afficher la mémoire");
+    AFF("-p = fixer une adresse comme point d'arrêt");
+    AFF("-r = afficher le registre");
+    AFF("-s = activer un stepper à chaque cycle");
+    AFF("-v = afficher la valeur d'une adresse à chaque cycle\n");
+    AFF("Les options -b -i -g -m -r nécessitent les options -s ou -p sinon elles sont ignorées. Les options peuvent être renseignées dans n'importe quel ordre.");
+    TANQUE stepper("Appuyez sur 'q' pour quitter l'aide : ", "q"):$
+  };
+  
+  # fonction ajoutée pour l'affichage des hexadécimaux dans le Franterprète
+  # convertit un nombre décimal en hexadécimal et l'affiche avec deux caractères
+  FONC affhex(decimal){
+    hex = decenhex(decimal); # convertit
+    SI LONG(hex) < 2: RET '0'+hex $; # ajoute un 0 devant au besoin
+    RET hex
+  };
+  
+  CEXE("math.fr"); # pour gérer hexadécimal
+  POUR(i=0;i<30;i++): AFF("====", '') $; # sépare chargement des fonctions de l'exécution
+  AFF(); # pour la lisibilité
+  main(programme, options) # démarre le programme ordipapier
+}

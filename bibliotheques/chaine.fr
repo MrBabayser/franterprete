@@ -1,0 +1,117 @@
+/*****************************************************************************************
+  Nom ......... : chaine.fr
+  Rôle ........ : petite bibliothèque de fonctions sur les chaines en langage Franterprète
+  Auteur ...... : Georges Miot
+  Version ..... : V1.0 du 24/10/2023
+  Licence ..... : réalisé dans le cadre du cours de I&C
+  Importation . : CEXE("chaine.fr")
+******************************************************************************************/
+
+// concatène les éléments convertis en chaîne d'une liste
+// concat(<LISTE <CHAINE|NOMBRE|BOOLEEN|LISTE>> liste)
+FONCTION concat(liste){
+	SI PAS INSTANCE(liste, 'li') OU TAILLE(liste) == 0:
+		AFFICHER("Fonction usage: concat(<LISTE <CHAINE|NOMBRE|BOOLEEN|LISTE>> liste)");
+		RETOURNER $;
+	resultat = '';
+	POUR CHAQUE chaine DANS liste:
+		resultat += CHAINE(chaine) $;
+	RETOURNER resultat
+};
+
+/* renvoie la position de la première occurrence d'une sous-chaine dans une chaîne
+	 commence à la position 0 
+	 trocha(<CHAINE> chaine, <CHAINE> souschaine) */
+FONCTION trocha(chaine, souschaine){
+	SI PAS INSTANCE(chaine, 'ch') OU PAS INSTANCE(souschaine, 'ch'):
+		AFFICHER("Fonction usage: trocha(<CHAINE> chaine, <CHAINE> souschaine)");
+		RETOURNER $;
+	taille_chaine = TAILLE(chaine);
+	taille_souschaine = TAILLE(souschaine);
+	SI taille_souschaine == 0: RETOURNER $;
+	taille_recherche = taille_chaine - taille_souschaine;
+	SI taille_recherche < 0: RETOURNER $; // sous-chaîne plus grande que chaîne
+	POUR(i=0;i<=taille_recherche;i++): // à partir de chaque caractère :
+		POUR(j=0;j<taille_souschaine;j++): // vérifie si la suite matche :
+			SI chaine[i+j] != souschaine[j]: STOP $; // caractère matche pas, va tester le suivant
+			SI j+1 == taille_souschaine: RETOURNER i $$$; // si sous-chaîne trouvée, retourne sa position
+	RETOURNER // pas nécessaire mais plus lisible
+};
+
+// remplace toutes les occurrences d'une sous-chaine par une nouvelle chaîne
+// remcha(<CHAINE> chaine, <CHAINE> souschaine, <CHAINE> nouvelle_chaine)
+FONCTION remcha(chaine, souschaine, nouvelle_chaine){
+	SI PAS INSTANCE(chaine, 'ch') OU PAS INSTANCE(souschaine, 'ch') OU PAS INSTANCE(nouvelle_chaine, 'ch'):
+		AFFICHER("Fonction usage: remcha(<CHAINE> chaine, <CHAINE> souschaine, <CHAINE> nouvelle_chaine)");
+		RETOURNER $;
+	taille_chaine = TAILLE(chaine);
+	taille_souschaine = TAILLE(souschaine);
+	SI taille_souschaine == 0: RETOURNER chaine $;
+	taille_recherche = taille_chaine - taille_souschaine;
+	SI taille_recherche < 0: RETOURNER chaine $; // sous-chaîne plus grande que chaîne
+	resultat = '';
+	POUR(i=0;i<taille_chaine;i++){ // à partir de chaque caractère :
+		chaine_temp = '';
+		POUR(j=0;j<taille_souschaine ET i+j<taille_chaine;j++){ // vérifie si la suite matche :
+			SI chaine[i+j] != souschaine[j]: // si caractère matche pas :
+				chaine_temp = chaine[i]; // laisse le caractère
+				STOP $; // va tester le caractère suivant
+			SI j+1 == taille_souschaine: // si sous-chaîne trouvée :
+				chaine_temp = nouvelle_chaine; // remplace la sous-chaîne
+				i += j; // saute aux prochains caractères à tester
+				STOP $; // va tester le caractère suivant
+			chaine_temp += souschaine[j] // ici caractère valide, retiens-le
+		};
+		resultat += chaine_temp; // construit la chaîne modifiée
+	};
+	RETOURNER resultat
+};
+
+/* découpe une chaîne avec une liste de délimiteurs
+	 renvoie une liste de sous-chaînes 
+	 deccha(<CHAINE> chaine, <LISTE <CHAINE|VIDE>> delimiteurs) */
+FONCTION deccha(chaine, liste_delimiteurs){
+	SI PAS INSTANCE(chaine, 'ch') OU PAS INSTANCE(liste_delimiteurs, 'li'):
+		AFFICHER("Fonction usage: deccha(<CHAINE> chaine, <LISTE <CHAINE|VIDE>> delimiteurs)");
+		RETOURNER $;
+	taille_chaine = TAILLE(chaine);
+	SI taille_chaine == 0: RETOURNER $;
+	taille_liste = TAILLE(liste_delimiteurs);
+	SI taille_liste == 0: RETOURNER chaine $; // aucun délimiteur, renvoie la chaîne entière
+	resultat = [];
+	chaine_temp = '';
+	POUR(i=0;i<taille_chaine;i++){ // à partir de chaque caractère :
+		delimiteur_trouve = FAUX;
+		POUR CHAQUE delimiteur DANS liste_delimiteurs: // teste chaque délimiteur :
+			SI delimiteur == chaine[i]: // si matche :
+				delimiteur_trouve = VRAI;
+				resultat[] = chaine_temp; // ajoute la sous-chaîne à la liste
+				chaine_temp = '';
+				STOP $$; // passe au caractère suivant
+		SI PAS delimiteur_trouve: chaine_temp += chaine[i] $ // sinon construit la sous-chaîne
+	};
+	SI PAS delimiteur_trouve: resultat[] = chaine_temp $; // ajoute la dernière sous-chaîne si aucun délimiteur à la fin de la chaîne
+	RETOURNER resultat
+};
+
+/* extrait une sous-chaîne par indication de la position de début et de fin
+	 si la position de début n'est pas indiquée alors débute au premier caractère
+	 si la position de fin n'est pas indiquée alors finit au dernier caractère
+	 si la position de début est plus grande que la position de fin alors renvoie une sous-chaîne inversée 
+	 soucha(<CHAINE> chaine, <NOMBRE|VIDE> debut, <NOMBRE|VIDE> fin) */
+FONCTION soucha(chaine, debut, fin){
+	SI PAS INSTANCE(chaine, 'ch') OU (PAS INSTANCE(debut, 'no') ET debut != VIDE) OU (PAS INSTANCE(fin, 'no') ET fin != VIDE):
+		AFFICHER("Fonction usage: soucha(<CHAINE> chaine, <NOMBRE|VIDE> debut, <NOMBRE|VIDE> fin)");
+		RETOURNER $;
+	taille_chaine = TAILLE(chaine);
+	SI debut == VIDE: debut = 0 $; // si la position de début n'est pas indiquée alors débute au premier caractère
+	SI fin == VIDE: fin = taille_chaine-1 $; // si la position de fin n'est pas indiquée alors finit au dernier caractère
+	chaine_temp = '';
+	SI debut > fin: // si la position de début est plus grande que la position de fin :
+		POUR(i=debut;i>=fin;i--): // crée la sous-chaîne inversée
+			chaine_temp += chaine[i] $$
+	SINON:
+		POUR(i=debut;i<=fin;i++): // crée la sous-chaîne
+			chaine_temp += chaine[i] $$;
+	RETOURNER chaine_temp
+};
